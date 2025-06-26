@@ -1,0 +1,1 @@
+This script will automatically locate a Windows Partition and mount it, and find and exfiltrate files matching specific categories. The slipstream script is best used when combined with a fast, low-overhead Linux bootable drive (ie: a small buildroot image).
