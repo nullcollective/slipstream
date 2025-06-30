@@ -60,7 +60,7 @@ poisoned_hosts=(
 # DO NOT EDIT BELOW UNLESS YOU NEED TO ADJUST THE CODE
 #-------------------------------------------------------
 echo -e "[: :|:::] slipstream by nullcollective [: :|:::]"
-echo -e "╭∩╮(ô¿ô)╭∩╮ FUCK MAGA ╭∩╮(ô¿ô)╭∩╮\n"
+echo -e "╭∩╮(ô¿ô)╭∩╮ DESTROY FASCISM ╭∩╮(ô¿ô)╭∩╮\n"
 echo -e "-------------------------------------------"
 echo "TARGET MOUNT: ${TARGET_MOUNT}"
 echo "USB MOUNT: ${USB_MOUNT}"
