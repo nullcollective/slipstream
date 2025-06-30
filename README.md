@@ -5,7 +5,7 @@ NEW FEATURE: Payload System
 ```
 $ ./slipstream.sh -h
 [: :|:::] slipstream by nullcollective [: :|:::]
-╭∩╮(ô¿ô)╭∩╮ FUCK MAGA ╭∩╮(ô¿ô)╭∩╮
+╭∩╮(ô¿ô)╭∩╮ DESTROY FASCISM ╭∩╮(ô¿ô)╭∩╮
 
 Usage: ./slipstream.sh [OPTIONS]
 Options:
@@ -16,7 +16,7 @@ Options:
 
 $ ./slipstream.sh -l
 [: :|:::] slipstream by nullcollective [: :|:::]
-╭∩╮(ô¿ô)╭∩╮ FUCK MAGA ╭∩╮(ô¿ô)╭∩╮
+╭∩╮(ô¿ô)╭∩╮ DESTROY FASCISM ╭∩╮(ô¿ô)╭∩╮
 
 AVAILABLE PAYLOADS
 -------------------------------------------
